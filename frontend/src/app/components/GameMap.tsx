@@ -13,6 +13,11 @@ interface GameMapProps {
 export default function GameMap({ gameState, onTerritorySelect, selectedTerritory }: GameMapProps) {
   const { publicKey } = useWallet();
   const [territories, setTerritories] = useState<Territory[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (gameState) {
@@ -23,7 +28,6 @@ export default function GameMap({ gameState, onTerritorySelect, selectedTerritor
   const getTerritoryStyling = (territory: Territory) => {
     const isSelected = selectedTerritory?.id === territory.id;
     const isOwned = territory.owner?.toString() === publicKey?.toString();
-    const isCurrentPlayer = gameState?.currentPlayer.toString() === publicKey?.toString();
 
     return {
       color: isSelected ? '#ff0' : (isOwned ? '#0f0' : '#f00'),
@@ -33,13 +37,18 @@ export default function GameMap({ gameState, onTerritorySelect, selectedTerritor
     };
   };
 
+  if (!mounted) {
+    return <div className="fixed inset-0 bg-gray-100" />;
+  }
+
   return (
-    <div className="w-full h-[600px] relative">
+    <div className="fixed inset-0 z-0">
       <MapContainer
         center={[20, 0]}
         zoom={2}
         style={{ height: "100%", width: "100%" }}
         maxBounds={[[-90, -180], [90, 180]]}
+        zoomControl={false}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
