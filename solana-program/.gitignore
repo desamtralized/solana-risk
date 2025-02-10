@@ -1,0 +1,37 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.so
+
+# Solana program build outputs
+/dist/
+*.so
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# npm/node (if using JavaScript/TypeScript for tests or client)
+node_modules/
+npm-debug.log*
+
+# Solana local validator data
+test-ledger/
+
+# Environment variables
+.env
+.env.*
+
+# Program keypairs
+*-keypair.json
+
+# Build artifacts
+build/
+
+# Anchor specific (if using Anchor framework)
+.anchor/
+target/
+**/*.anchor 
