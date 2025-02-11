@@ -1,0 +1,20 @@
+[package]
+name = "player"
+version = "0.1.0"
+description = "Player management program for Risk game"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "player"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.29.0"
+territory = { path = "../territory", features = ["cpi"] } 

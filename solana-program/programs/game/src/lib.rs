@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use std::hash::Hash;
 
-declare_id!("G4irLCSNHfxh2eCVpXowciffLtbnwGm1mGXU28afPsPJ");
+declare_id!("2xSKm7wjDPL9tBZNKRjkUE5Gn5dwQeJ5VnDXNH1UuS35");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum PlayerColor {
@@ -195,9 +195,13 @@ pub mod risk_game {
             ErrorCode::InvalidPhase
         );
 
-        // Validate territories and troops
-        let from_territory_ref =
-            &ctx.accounts.territory_account.territories[from_territory as usize];
+        // Use territory program to validate and update territories
+        let territory_program = ctx.accounts.territory_program.to_account_info();
+        let territory_state = ctx.accounts.territory_state.to_account_info();
+        let authority = ctx.accounts.player.to_account_info();
+
+        // Get territory information
+        let from_territory_ref = &ctx.accounts.territory_state.territories[from_territory as usize];
         require!(
             from_territory_ref.owner == Some(ctx.accounts.player.key()),
             ErrorCode::NotTerritoryOwner
@@ -208,58 +212,70 @@ pub mod risk_game {
         );
         require!(attacking_dice <= 3, ErrorCode::InvalidDiceCount);
 
-        let to_territory_ref = &ctx.accounts.territory_account.territories[to_territory as usize];
+        let to_territory_ref = &ctx.accounts.territory_state.territories[to_territory as usize];
         require!(
             to_territory_ref.owner != Some(ctx.accounts.player.key()),
             ErrorCode::CannotAttackOwnTerritory
         );
 
-        // Validate territories are adjacent
-        require!(
-            from_territory_ref
-                .adjacent_territories
-                .contains(&to_territory),
-            ErrorCode::TerritoriesNotAdjacent
-        );
-
-        // Roll dice
+        // Roll dice and resolve combat
         let attacker_dice = roll_dice(attacking_dice);
         let defender_dice = roll_dice(std::cmp::min(2, to_territory_ref.troops));
 
-        // Store dice rolls
         game.last_attack_dice = Some(AttackDice {
             attacker: attacker_dice.clone(),
             defender: defender_dice.clone(),
         });
 
-        // Resolve combat
         let (attacker_losses, defender_losses) = resolve_combat(&attacker_dice, &defender_dice);
 
-        // Update territories
-        let territories = &mut ctx.accounts.territory_account.territories;
-        territories[from_territory as usize].troops -= attacker_losses;
+        // Update territories using CPI
+        territory::cpi_interface::update_territory(
+            territory_program.clone(),
+            territory_state.clone(),
+            authority.clone(),
+            from_territory,
+            Some(ctx.accounts.player.key()),
+            from_territory_ref.troops - attacker_losses,
+        )?;
 
-        let defending_territory = &mut territories[to_territory as usize];
-        defending_territory.troops -= defender_losses;
+        let defending_territory =
+            &mut ctx.accounts.territory_state.territories[to_territory as usize];
+        if defending_territory.troops <= defender_losses {
+            // Territory conquered
+            territory::cpi_interface::update_territory(
+                territory_program.clone(),
+                territory_state.clone(),
+                authority.clone(),
+                to_territory,
+                Some(ctx.accounts.player.key()),
+                attacking_dice - attacker_losses,
+            )?;
 
-        // Check if territory was conquered
-        if defending_territory.troops == 0 {
-            defending_territory.owner = Some(ctx.accounts.player.key());
-            defending_territory.troops = attacking_dice - attacker_losses;
-            territories[from_territory as usize].troops -= attacking_dice;
+            // Update player state using CPI
+            let player_program = ctx.accounts.player_program.to_account_info();
+            let player_state = ctx.accounts.player_state.to_account_info();
 
-            // Mark that player conquered a territory this turn (for card awarding)
-            let player = ctx
-                .accounts
-                .player_account
-                .players
-                .iter_mut()
-                .find(|p| p.pubkey == ctx.accounts.player.key())
-                .unwrap();
-            player.conquered_territory_this_turn = true;
+            player::cpi_interface::set_conquered_territory(
+                player_program,
+                player_state,
+                authority.clone(),
+                ctx.accounts.player.key(),
+                true,
+            )?;
+        } else {
+            // Territory not conquered
+            territory::cpi_interface::update_territory(
+                territory_program.clone(),
+                territory_state.clone(),
+                authority.clone(),
+                to_territory,
+                defending_territory.owner,
+                defending_territory.troops - defender_losses,
+            )?;
         }
 
-        check_victory_condition(game, &ctx.accounts.territory_account);
+        check_victory_condition(game, &ctx.accounts.territory_state);
         Ok(())
     }
 
@@ -468,6 +484,12 @@ pub struct MakeMove<'info> {
     #[account(mut, constraint = player_account.game == game.key())]
     pub player_account: Account<'info, PlayerAccount>,
     pub player: Signer<'info>,
+    pub territory_program: Program<'info, territory::program::Territory>,
+    #[account(mut)]
+    pub territory_state: Account<'info, territory::TerritoryState>,
+    pub player_program: Program<'info, player::program::Player>,
+    #[account(mut)]
+    pub player_state: Account<'info, player::PlayerState>,
 }
 
 #[account]
@@ -602,7 +624,7 @@ impl PlayerAccount {
 
 fn calculate_reinforcements(
     territory_account: &Account<TerritoryAccount>,
-    player_account: &Account<PlayerAccount>,
+    _player_account: &Account<PlayerAccount>,
     player: &Pubkey,
 ) -> u8 {
     let territories_owned = territory_account
@@ -675,11 +697,11 @@ fn generate_risk_card() -> RiskCard {
 
 fn check_victory_condition(
     game: &mut Account<Game>,
-    territory_account: &Account<TerritoryAccount>,
+    territory_state: &Account<territory::TerritoryState>,
 ) {
-    let first_owner = territory_account.territories[0].owner;
+    let first_owner = territory_state.territories[0].owner;
     if first_owner.is_some()
-        && territory_account
+        && territory_state
             .territories
             .iter()
             .all(|t| t.owner == first_owner)
@@ -787,10 +809,4 @@ fn are_territories_connected(
     }
 
     false
-}
-
-fn color_to_id(color: String) -> u8 {
-    // Implement the logic to convert a color string to a u8
-    // This is a placeholder and should be replaced with the actual implementation
-    0 // Placeholder return, actual implementation needed
 }

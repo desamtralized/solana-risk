@@ -65,7 +65,7 @@ export function useGame() {
     try {
       setIsLoading(true);
       setError(null);
-      const { gameAccount: newGameAccount } = await gameService.initializeGame();
+      const { gameAccount: newGameAccount } = await gameService.initializeGame('red');
       setGameAccount(newGameAccount);
       await fetchGameState();
     } catch (err) {
@@ -88,7 +88,7 @@ export function useGame() {
     try {
       setIsLoading(true);
       setError(null);
-      await gameService.joinGame(gameAccountAddress);
+      await gameService.joinGame(gameAccountAddress, 'red');
       setGameAccount(gameAccountAddress);
       await fetchGameState();
     } catch (err) {
