@@ -13,6 +13,15 @@ export enum TurnPhase {
   Fortification = "Fortification"
 }
 
+export enum PlayerColor {
+  Red = "Red",
+  Blue = "Blue",
+  Green = "Green",
+  Yellow = "Yellow",
+  Purple = "Purple",
+  Orange = "Orange"
+}
+
 export enum CardType {
   Infantry = "Infantry",
   Cavalry = "Cavalry",
@@ -27,7 +36,7 @@ export interface RiskCard {
 
 export interface Player {
   publicKey: PublicKey;
-  color: string;
+  color: PlayerColor;
   cards: RiskCard[];
   conqueredTerritoryThisTurn: boolean;
 }
