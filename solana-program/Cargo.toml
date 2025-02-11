@@ -1,21 +1,20 @@
-[package]
-name = "risk-game"
-version = "0.1.0"
-description = "A Risk-like game built on Solana"
-edition = "2021"
+[workspace]
+members = [
+    "programs/*"
+]
+resolver = "2"
 
-[lib]
-crate-type = ["cdylib", "lib"]
-name = "risk_game"
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
 
-[features]
-no-entrypoint = []
-no-idl = []
-no-log-ix-name = []
-cpi = ["no-entrypoint"]
-default = []
-idl-build = ["anchor-lang/idl-build"]
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
 
-[dependencies]
-anchor-lang = "0.29.0"
-itertools = "0.12.0" 
+[profile.release.package."*"]
+opt-level = 3

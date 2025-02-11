@@ -1,17 +1,36 @@
-import { Program, AnchorProvider, Idl } from '@project-serum/anchor';
-import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
+import { Program, AnchorProvider } from '@project-serum/anchor';
+import { Connection, PublicKey, SystemProgram, Keypair } from '@solana/web3.js';
 import { AnchorWallet } from '@solana/wallet-adapter-react';
-import { GameAccount } from '../types/game';
-import IDL from './risk_game.json';
+import { INITIAL_TERRITORIES } from '../constants/gameData';
+import { GAME_PROGRAM_ID, PLAYER_PROGRAM_ID, TERRITORY_PROGRAM_ID } from '../constants/programIds';
+import { GameIDL, PlayerIDL, TerritoryIDL, RiskGame, Player, Territory as TerritoryProgram, GameAccount } from '../idl/types';
 
-// Import the IDL (you'll need to generate this after building the program)
-// import { RiskGame } from '../types/risk_game';
+// Custom error class for game-specific errors
+export class GameError extends Error {
+  constructor(message: string, public code?: string) {
+    super(message);
+    this.name = 'GameError';
+  }
+}
 
-// Program ID from Anchor.toml
-const PROGRAM_ID = new PublicKey('G4irLCSNHfxh2eCVpXowciffLtbnwGm1mGXU28afPsPJ');
+interface ProgramTerritory {
+  id: number;
+  continentId: number;
+  owner: PublicKey | null;
+  troops: number;
+  adjacentTerritories: Buffer;
+}
+
+interface ProgramContinent {
+  id: number;
+  territories: Buffer;
+  bonusArmies: number;
+}
 
 export class GameService {
-  private program: Program;
+  private program: Program<RiskGame>;
+  private playerProgram: Program<Player>;
+  private territoryProgram: Program<TerritoryProgram>;
 
   constructor(
     connection: Connection,
@@ -19,60 +38,253 @@ export class GameService {
   ) {
     const provider = new AnchorProvider(connection, wallet, {
       commitment: 'confirmed',
+      preflightCommitment: 'confirmed',
     });
-    this.program = new Program(IDL as Idl, PROGRAM_ID, provider);
+    this.program = new Program(GameIDL, GAME_PROGRAM_ID, provider);
+    this.playerProgram = new Program(PlayerIDL, PLAYER_PROGRAM_ID, provider);
+    this.territoryProgram = new Program(TerritoryIDL, TERRITORY_PROGRAM_ID, provider);
   }
 
-  async initializeGame(): Promise<{ gameAccount: PublicKey }> {
-    const gameAccount = PublicKey.unique();
-    
+  private transformTerritories(territories: typeof INITIAL_TERRITORIES): ProgramTerritory[] {
+    // Optimize territory data by using smaller adjacent territory arrays
+    return territories.slice(0, 15).map(t => ({  // Reduce to 15 territories initially
+      id: t.id,
+      continentId: parseInt(t.continent),
+      owner: null,
+      troops: 0,
+      adjacentTerritories: Buffer.from(new Uint8Array(t.adjacentTerritories.slice(0, 4))),  // Limit to 4 adjacent territories
+    }));
+  }
+
+  private transformContinents(continents: { id: string; territories: number[]; bonusArmies: number }[]): ProgramContinent[] {
+    // Only include essential continent data
+    return continents.slice(0, 3).map(c => ({  // Reduce to 3 continents initially
+      id: parseInt(c.id),
+      territories: Buffer.from(new Uint8Array(c.territories.slice(0, 5))),  // Limit to 5 territories per continent
+      bonusArmies: c.bonusArmies,
+    }));
+  }
+
+  async initializeGame(playerColor: string): Promise<{ gameAccount: PublicKey }> {
+    try {
+      const gameKeypair = Keypair.generate();
+      const territoryKeypair = Keypair.generate();
+      const playerKeypair = Keypair.generate();
+      
+      const provider = this.program.provider as AnchorProvider;
+      if (!provider.wallet.publicKey) {
+        throw new GameError('Wallet not connected', 'WALLET_NOT_CONNECTED');
+      }
+
+      const walletPublicKey = provider.wallet.publicKey;
+
+      // Initialize game with reduced data
+      await this.program.methods
+        .initializeGame(
+          playerColor,
+          this.transformTerritories(INITIAL_TERRITORIES),
+          this.transformContinents(INITIAL_TERRITORIES.map(t => ({
+            id: t.continent,
+            territories: [t.id],
+            bonusArmies: 1
+          })))
+        )
+        .accounts({
+          game: gameKeypair.publicKey,
+          territoryAccount: territoryKeypair.publicKey,
+          playerAccount: playerKeypair.publicKey,
+          creator: walletPublicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([gameKeypair, territoryKeypair, playerKeypair])
+        .rpc();
+
+      return { gameAccount: gameKeypair.publicKey };
+    } catch (error) {
+      console.error('Error details:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('insufficient funds')) {
+          throw new GameError('Insufficient SOL to create game. Please fund your wallet.', 'INSUFFICIENT_FUNDS');
+        }
+        throw new GameError(`Failed to initialize game: ${error.message}`, 'INITIALIZATION_FAILED');
+      }
+      throw new GameError('An unknown error occurred while initializing the game', 'UNKNOWN_ERROR');
+    }
+  }
+
+  async joinGame(gameAccount: PublicKey, playerColor: string): Promise<void> {
+    const provider = this.program.provider as AnchorProvider;
+    if (!provider.wallet.publicKey) {
+      throw new GameError('Wallet not connected', 'WALLET_NOT_CONNECTED');
+    }
+
+    const walletPublicKey = provider.wallet.publicKey;
+
     await this.program.methods
-      .initializeGame()
+      .joinGame(playerColor)
       .accounts({
         game: gameAccount,
-        creator: this.program.provider.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
-
-    return { gameAccount };
-  }
-
-  async joinGame(gameAccount: PublicKey): Promise<void> {
-    await this.program.methods
-      .joinGame()
-      .accounts({
-        game: gameAccount,
-        player: this.program.provider.publicKey,
+        playerAccount: await this.findPlayerAccountPDA(gameAccount),
+        player: walletPublicKey,
       })
       .rpc();
   }
 
-  async placeTroops(
+  private async findPlayerAccountPDA(gameAccount: PublicKey): Promise<PublicKey> {
+    const [pda] = await PublicKey.findProgramAddress(
+      [Buffer.from('player'), gameAccount.toBuffer()],
+      this.playerProgram.programId
+    );
+    return pda;
+  }
+
+  private async findTerritoryAccountPDA(gameAccount: PublicKey): Promise<PublicKey> {
+    const [pda] = await PublicKey.findProgramAddress(
+      [Buffer.from('territory'), gameAccount.toBuffer()],
+      this.territoryProgram.programId
+    );
+    return pda;
+  }
+
+  async placeReinforcements(
     gameAccount: PublicKey,
-    territoryId: number,
-    troops: number
+    placements: { territoryId: number, troops: number }[]
   ): Promise<void> {
+    const provider = this.program.provider as AnchorProvider;
+    if (!provider.wallet.publicKey) {
+      throw new GameError('Wallet not connected', 'WALLET_NOT_CONNECTED');
+    }
+
+    const walletPublicKey = provider.wallet.publicKey;
+    const playerAccount = await this.findPlayerAccountPDA(gameAccount);
+    const territoryAccount = await this.findTerritoryAccountPDA(gameAccount);
+
+    const formattedPlacements = placements.map(p => [p.territoryId, p.troops]);
+
     await this.program.methods
-      .placeTroops(territoryId, troops)
+      .placeReinforcements(formattedPlacements)
       .accounts({
         game: gameAccount,
-        player: this.program.provider.publicKey,
+        territoryAccount,
+        playerAccount,
+        player: walletPublicKey,
+        territoryProgram: this.territoryProgram.programId,
+        territoryState: territoryAccount,
+        playerProgram: this.playerProgram.programId,
+        playerState: playerAccount,
       })
       .rpc();
   }
 
-  async makeMove(
+  async attack(
+    gameAccount: PublicKey,
+    fromTerritory: number,
+    toTerritory: number,
+    attackingDice: number
+  ): Promise<void> {
+    const provider = this.program.provider as AnchorProvider;
+    if (!provider.wallet.publicKey) {
+      throw new GameError('Wallet not connected', 'WALLET_NOT_CONNECTED');
+    }
+
+    const walletPublicKey = provider.wallet.publicKey;
+    const playerAccount = await this.findPlayerAccountPDA(gameAccount);
+    const territoryAccount = await this.findTerritoryAccountPDA(gameAccount);
+
+    await this.program.methods
+      .attack(fromTerritory, toTerritory, attackingDice)
+      .accounts({
+        game: gameAccount,
+        territoryAccount,
+        playerAccount,
+        player: walletPublicKey,
+        territoryProgram: this.territoryProgram.programId,
+        territoryState: territoryAccount,
+        playerProgram: this.playerProgram.programId,
+        playerState: playerAccount,
+      })
+      .rpc();
+  }
+
+  async fortify(
     gameAccount: PublicKey,
     fromTerritory: number,
     toTerritory: number,
     troops: number
   ): Promise<void> {
+    const provider = this.program.provider as AnchorProvider;
+    if (!provider.wallet.publicKey) {
+      throw new GameError('Wallet not connected', 'WALLET_NOT_CONNECTED');
+    }
+
+    const walletPublicKey = provider.wallet.publicKey;
+    const playerAccount = await this.findPlayerAccountPDA(gameAccount);
+    const territoryAccount = await this.findTerritoryAccountPDA(gameAccount);
+
     await this.program.methods
-      .attackTerritory(fromTerritory, toTerritory, troops)
+      .fortify(fromTerritory, toTerritory, troops)
       .accounts({
         game: gameAccount,
-        player: this.program.provider.publicKey,
+        territoryAccount,
+        playerAccount,
+        player: walletPublicKey,
+        territoryProgram: this.territoryProgram.programId,
+        territoryState: territoryAccount,
+        playerProgram: this.playerProgram.programId,
+        playerState: playerAccount,
+      })
+      .rpc();
+  }
+
+  async endPhase(gameAccount: PublicKey): Promise<void> {
+    const provider = this.program.provider as AnchorProvider;
+    if (!provider.wallet.publicKey) {
+      throw new GameError('Wallet not connected', 'WALLET_NOT_CONNECTED');
+    }
+
+    const walletPublicKey = provider.wallet.publicKey;
+    const playerAccount = await this.findPlayerAccountPDA(gameAccount);
+    const territoryAccount = await this.findTerritoryAccountPDA(gameAccount);
+
+    await this.program.methods
+      .endPhase()
+      .accounts({
+        game: gameAccount,
+        territoryAccount,
+        playerAccount,
+        player: walletPublicKey,
+        territoryProgram: this.territoryProgram.programId,
+        territoryState: territoryAccount,
+        playerProgram: this.playerProgram.programId,
+        playerState: playerAccount,
+      })
+      .rpc();
+  }
+
+  async tradeCards(
+    gameAccount: PublicKey,
+    cardIndices: number[]
+  ): Promise<void> {
+    const provider = this.program.provider as AnchorProvider;
+    if (!provider.wallet.publicKey) {
+      throw new GameError('Wallet not connected', 'WALLET_NOT_CONNECTED');
+    }
+
+    const walletPublicKey = provider.wallet.publicKey;
+    const playerAccount = await this.findPlayerAccountPDA(gameAccount);
+    const territoryAccount = await this.findTerritoryAccountPDA(gameAccount);
+
+    await this.program.methods
+      .tradeCards(Buffer.from(cardIndices))
+      .accounts({
+        game: gameAccount,
+        territoryAccount,
+        playerAccount,
+        player: walletPublicKey,
+        territoryProgram: this.territoryProgram.programId,
+        territoryState: territoryAccount,
+        playerProgram: this.playerProgram.programId,
+        playerState: playerAccount,
       })
       .rpc();
   }
