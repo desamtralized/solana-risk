@@ -1494,13 +1494,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "solana-program-new"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
-]
-
-[[package]]
 name = "solana-sdk-macro"
 version = "1.18.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
