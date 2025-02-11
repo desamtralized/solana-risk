@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use std::hash::Hash;
 
-declare_id!("3BxfMQouUVCckUpmbyfF9eGeHnzfJSJPzuZPpCvt99E7");
+declare_id!("7GTG5YucwCqnmcHoeTVs8vwt9MhXjQdCXs8yToHpHPHC");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum PlayerColor {

@@ -21,13 +21,15 @@ export default function Home() {
   const { publicKey } = useWallet();
   const [selectedTerritory, setSelectedTerritory] = useState<Territory | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [gameAddress, setGameAddress] = useState<PublicKey | null>(null);
   const {
     gameState,
     isLoading,
     error,
     createGame,
-    joinGame,
     attackTerritory,
+    joinGame,
+    loadGame,
   } = useGame();
 
   useEffect(() => {
@@ -49,6 +51,13 @@ export default function Home() {
     }
   };
 
+  const handleCreateGame = async () => {
+    const result = await createGame();
+    if (result?.gameAccount) {
+      setGameAddress(result.gameAccount);
+    }
+  };
+
   if (!mounted) {
     return null;
   }
@@ -65,7 +74,7 @@ export default function Home() {
               {!gameState && publicKey && (
                 <>
                   <button
-                    onClick={createGame}
+                    onClick={handleCreateGame}
                     disabled={isLoading}
                     className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
                   >
@@ -76,7 +85,9 @@ export default function Home() {
                       const gameAddress = prompt('Enter game address:');
                       if (gameAddress) {
                         try {
-                          joinGame(new PublicKey(gameAddress));
+                          const pubkey = new PublicKey(gameAddress);
+                          setGameAddress(pubkey);
+                          joinGame(pubkey);
                         } catch (error) {
                           console.error('Invalid game address:', error);
                         }
@@ -88,6 +99,26 @@ export default function Home() {
                     Join Game
                   </button>
                 </>
+              )}
+              {publicKey && (
+                <button
+                  onClick={() => {
+                    const gameAddress = prompt('Enter game address:');
+                    if (gameAddress) {
+                      try {
+                        const pubkey = new PublicKey(gameAddress);
+                        setGameAddress(pubkey);
+                        loadGame(pubkey);
+                      } catch (error) {
+                        console.error('Invalid game address:', error);
+                      }
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+                >
+                  Load Game
+                </button>
               )}
               <ClientWallet />
             </div>
@@ -103,10 +134,28 @@ export default function Home() {
           
           {gameState && (
             <div className="mt-4 p-4 bg-white/10 backdrop-blur-sm rounded text-white">
+              {gameAddress && (
+                <div className="mb-2 flex items-center gap-2">
+                  <p>Game Address: {gameAddress.toString()}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(gameAddress.toString());
+                    }}
+                    className="px-2 py-1 text-sm bg-gray-500 hover:bg-gray-600 rounded"
+                  >
+                    Copy
+                  </button>
+                </div>
+              )}
               <p>Turn: {gameState.turn}</p>
-              <p>State: {gameState.state.toString()}</p>
+              <p>State: {Object.keys(gameState.state)[0]}</p>
+              <p>Phase: {Object.keys(gameState.currentPhase)[0]}</p>
+              <p>Current Player: {gameState.currentPlayer.toString()}</p>
               {gameState.currentPlayer.toString() === publicKey?.toString() && (
                 <p className="text-green-500 font-bold">Your turn!</p>
+              )}
+              {gameState.pendingReinforcements && (
+                <p>Pending Reinforcements: {gameState.pendingReinforcements}</p>
               )}
             </div>
           )}

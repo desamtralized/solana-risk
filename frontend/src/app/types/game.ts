@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 export enum GameState {
+  Initializing = "Initializing",
   Setup = "Setup",
   InProgress = "InProgress",
   Completed = "Completed"
@@ -54,11 +55,14 @@ export interface GameAccount {
   currentPhase: TurnPhase;
   territories: Territory[];
   continents: Continent[];
-  cardSetsTurnedIn: number; // To track increasing card set values
-  lastAttackDice?: {
+  cardsSetsTurnedIn: number;
+  lastAttackDice: {
     attacker: number[];
     defender: number[];
-  };
+  } | null;
+  pendingReinforcements: number | null;
+  territoryAccount: PublicKey;
+  playerAccount: PublicKey;
 }
 
 export const CONTINENTS: Continent[] = [
@@ -96,21 +100,42 @@ export const CONTINENTS: Continent[] = [
 
 export const TERRITORY_COORDINATES: Record<string, [number, number][]> = {
   "North America": [
-    [60, -140], [60, -60], [30, -60], [30, -140]
+    [75, -170], // Alaska
+    [75, -100], // Northwest Territory
+    [75, -40],  // Greenland
+    [45, -170], // Western edge
+    [45, -40],  // Eastern edge
+    [30, -170], // Southern edge
+    [30, -40]   // Southern edge
   ],
   "South America": [
-    [10, -80], [10, -35], [-50, -35], [-50, -80]
-  ],
-  "Africa": [
-    [35, -20], [35, 50], [-35, 50], [-35, -20]
+    [10, -85],  // Northern edge
+    [10, -35],  // Northern edge
+    [-55, -75], // Southern edge
+    [-55, -35]  // Southern edge
   ],
   "Europe": [
-    [70, -10], [70, 40], [45, 40], [45, -10]
+    [70, -25],  // Iceland
+    [70, 40],   // Northern edge
+    [45, -10],  // Western edge
+    [45, 40]    // Eastern edge
+  ],
+  "Africa": [
+    [35, -15],  // Northern edge
+    [35, 50],   // Northern edge
+    [-35, 50],  // Southern edge
+    [-35, -15]  // Southern edge
   ],
   "Asia": [
-    [70, 40], [70, 170], [0, 170], [0, 40]
+    [75, 40],   // Northern edge
+    [75, 170],  // Northern edge
+    [15, 170],  // Southern edge
+    [15, 40]    // Southern edge
   ],
   "Australia": [
-    [-10, 110], [-10, 155], [-40, 155], [-40, 110]
+    [-10, 110], // Northern edge
+    [-10, 180], // Northern edge
+    [-45, 180], // Southern edge
+    [-45, 110]  // Southern edge
   ]
 }; 

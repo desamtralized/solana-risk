@@ -6,7 +6,103 @@ import { IDL as TerritoryIDL } from './territory';
 // Define the tuple type for (u8,u8)
 export type U8Tuple = [number, number];
 
-export type RiskGame = typeof GameIDL;
+export type RiskGame = {
+  version: "0.1.0";
+  name: "risk_game";
+  instructions: [
+    {
+      name: "initializeGame";
+      accounts: [
+        {
+          name: "game";
+          isMut: true;
+          isSigner: true;
+        },
+        {
+          name: "territoryAccount";
+          isMut: true;
+          isSigner: true;
+        },
+        {
+          name: "playerAccount";
+          isMut: true;
+          isSigner: true;
+        },
+        {
+          name: "creator";
+          isMut: false;
+          isSigner: true;
+        },
+        {
+          name: "systemProgram";
+          isMut: false;
+          isSigner: false;
+        }
+      ];
+      args: [
+        {
+          name: "color";
+          type: "string";
+        },
+        {
+          name: "territories";
+          type: {
+            vec: {
+              defined: "Territory";
+            };
+          };
+        },
+        {
+          name: "continents";
+          type: {
+            vec: {
+              defined: "Continent";
+            };
+          };
+        }
+      ];
+    },
+    {
+      name: "initializeTerritories";
+      accounts: [
+        {
+          name: "game";
+          isMut: true;
+          isSigner: false;
+        },
+        {
+          name: "territoryAccount";
+          isMut: true;
+          isSigner: false;
+        },
+        {
+          name: "creator";
+          isMut: false;
+          isSigner: true;
+        }
+      ];
+      args: [
+        {
+          name: "territories";
+          type: {
+            vec: {
+              defined: "Territory";
+            };
+          };
+        },
+        {
+          name: "continents";
+          type: {
+            vec: {
+              defined: "Continent";
+            };
+          };
+        }
+      ];
+    }
+  ];
+};
+
 export type Player = typeof PlayerIDL;
 export type Territory = typeof TerritoryIDL;
 

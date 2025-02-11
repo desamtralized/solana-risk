@@ -68,6 +68,7 @@ export function useGame() {
       const { gameAccount: newGameAccount } = await gameService.initializeGame('red');
       setGameAccount(newGameAccount);
       await fetchGameState();
+      return { gameAccount: newGameAccount };
     } catch (err) {
       if (err instanceof GameError) {
         setError({ name: 'GameError', message: err.message, code: err.code });
@@ -146,12 +147,35 @@ export function useGame() {
     }
   };
 
+  const loadGame = async (gameAccountAddress: PublicKey) => {
+    if (!gameService) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      setGameAccount(gameAccountAddress);
+      await fetchGameState();
+    } catch (err) {
+      if (err instanceof GameError) {
+        setError({ name: 'GameError', message: err.message, code: err.code });
+      } else if (err instanceof Error) {
+        setError({ name: err.name, message: err.message });
+      } else {
+        setError({ name: 'UnknownError', message: 'An unknown error occurred' });
+      }
+      console.error('Error loading game:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     gameState,
     isLoading,
     error,
     createGame,
     joinGame,
+    loadGame,
     attackTerritory,
     placeTroops,
     connected: !!wallet.publicKey,

@@ -46,19 +46,21 @@ export class GameService {
   }
 
   private transformTerritories(territories: typeof INITIAL_TERRITORIES): ProgramTerritory[] {
-    return territories.map(t => ({
+    // Optimize territory data by using smaller adjacent territory arrays
+    return territories.slice(0, 15).map(t => ({  // Reduce to 15 territories initially
       id: t.id,
       continentId: parseInt(t.continent),
       owner: null,
       troops: 0,
-      adjacentTerritories: Buffer.from(t.adjacentTerritories),
+      adjacentTerritories: Buffer.from(new Uint8Array(t.adjacentTerritories.slice(0, 4))),  // Limit to 4 adjacent territories
     }));
   }
 
   private transformContinents(continents: { id: string; territories: number[]; bonusArmies: number }[]): ProgramContinent[] {
-    return continents.map(c => ({
+    // Only include essential continent data
+    return continents.slice(0, 3).map(c => ({  // Reduce to 3 continents initially
       id: parseInt(c.id),
-      territories: Buffer.from(c.territories),
+      territories: Buffer.from(new Uint8Array(c.territories.slice(0, 5))),  // Limit to 5 territories per continent
       bonusArmies: c.bonusArmies,
     }));
   }
@@ -76,7 +78,7 @@ export class GameService {
 
       const walletPublicKey = provider.wallet.publicKey;
 
-      // Initialize game account
+      // Initialize game with reduced data
       await this.program.methods
         .initializeGame(
           playerColor,
@@ -84,7 +86,7 @@ export class GameService {
           this.transformContinents(INITIAL_TERRITORIES.map(t => ({
             id: t.continent,
             territories: [t.id],
-            bonusArmies: 1 // This should come from your game config
+            bonusArmies: 1
           })))
         )
         .accounts({
