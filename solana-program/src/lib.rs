@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use std::hash::Hash;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("G4irLCSNHfxh2eCVpXowciffLtbnwGm1mGXU28afPsPJ");
 
 #[program]
 pub mod risk_game {
@@ -151,10 +151,18 @@ pub struct Territory {
 
 impl Game {
     pub const SPACE: usize = 32 + // current_player
-                            32 * 6 + // players (max 6 players)
+                            4 + (32 * 6) + // players vec length + data (max 6 players)
                             1 + // turn
-                            1 + // state
-                            1000; // territories (approximate space)
+                            1 + // state enum
+                            4 + (// territories vec length
+                                6 * ( // 6 territories
+                                    1 + // id
+                                    32 + // name string length + data (approximate)
+                                    1 + 32 + // Option<Pubkey> for owner
+                                    1 + // troops
+                                    4 + 6 // adjacent_territories vec length + data (max 6 adjacent)
+                                )
+                            );
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]

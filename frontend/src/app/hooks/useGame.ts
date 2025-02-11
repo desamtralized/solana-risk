@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
-import { GameService } from '../services/gameService';
+import { GameService, GameError } from '../services/gameService';
 import { GameAccount, Territory } from '../types/game';
 import { AnchorWallet } from '@solana/wallet-adapter-react';
+
+export interface GameErrorState {
+  name: string;
+  message: string;
+  code?: string;
+}
 
 export function useGame() {
   const { connection } = useConnection();
@@ -12,7 +18,7 @@ export function useGame() {
   const [gameState, setGameState] = useState<GameAccount | null>(null);
   const [gameAccount, setGameAccount] = useState<PublicKey | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<GameErrorState | null>(null);
 
   useEffect(() => {
     if (
@@ -49,7 +55,7 @@ export function useGame() {
       setGameState(state);
     } catch (err) {
       console.error('Error fetching game state:', err);
-      setError('Failed to fetch game state');
+      setError({ name: 'FetchError', message: 'Failed to fetch game state' });
     }
   };
 
@@ -63,8 +69,14 @@ export function useGame() {
       setGameAccount(newGameAccount);
       await fetchGameState();
     } catch (err) {
+      if (err instanceof GameError) {
+        setError({ name: 'GameError', message: err.message, code: err.code });
+      } else if (err instanceof Error) {
+        setError({ name: err.name, message: err.message });
+      } else {
+        setError({ name: 'UnknownError', message: 'An unknown error occurred' });
+      }
       console.error('Error creating game:', err);
-      setError('Failed to create game');
     } finally {
       setIsLoading(false);
     }
@@ -80,8 +92,14 @@ export function useGame() {
       setGameAccount(gameAccountAddress);
       await fetchGameState();
     } catch (err) {
+      if (err instanceof GameError) {
+        setError({ name: 'GameError', message: err.message, code: err.code });
+      } else if (err instanceof Error) {
+        setError({ name: err.name, message: err.message });
+      } else {
+        setError({ name: 'UnknownError', message: 'An unknown error occurred' });
+      }
       console.error('Error joining game:', err);
-      setError('Failed to join game');
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +124,7 @@ export function useGame() {
       await fetchGameState();
     } catch (err) {
       console.error('Error attacking territory:', err);
-      setError('Failed to attack territory');
+      setError({ name: 'AttackError', message: 'Failed to attack territory' });
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +140,7 @@ export function useGame() {
       await fetchGameState();
     } catch (err) {
       console.error('Error placing troops:', err);
-      setError('Failed to place troops');
+      setError({ name: 'PlacementError', message: 'Failed to place troops' });
     } finally {
       setIsLoading(false);
     }

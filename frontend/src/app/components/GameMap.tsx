@@ -45,7 +45,7 @@ export default function GameMap({ gameState, onTerritorySelect, selectedTerritor
     <div className="fixed inset-0 z-0">
       <MapContainer
         center={[20, 0]}
-        zoom={2}
+        zoom={3.5}
         style={{ height: "100%", width: "100%" }}
         maxBounds={[[-90, -180], [90, 180]]}
         zoomControl={false}

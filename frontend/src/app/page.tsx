@@ -95,14 +95,16 @@ export default function Home() {
           
           {error && (
             <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
-              {error}
+              <p className="font-bold">{error.name}</p>
+              <p>{error.message}</p>
+              {error.code && <p className="text-sm mt-1">Error code: {error.code}</p>}
             </div>
           )}
           
           {gameState && (
             <div className="mt-4 p-4 bg-white/10 backdrop-blur-sm rounded text-white">
               <p>Turn: {gameState.turn}</p>
-              <p>State: {gameState.state}</p>
+              <p>State: {gameState.state.toString()}</p>
               {gameState.currentPlayer.toString() === publicKey?.toString() && (
                 <p className="text-green-500 font-bold">Your turn!</p>
               )}

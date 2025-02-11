@@ -1,14 +1,19 @@
 import { Program, AnchorProvider, Idl } from '@project-serum/anchor';
-import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram, Keypair } from '@solana/web3.js';
 import { AnchorWallet } from '@solana/wallet-adapter-react';
 import { GameAccount } from '../types/game';
 import IDL from './risk_game.json';
 
-// Import the IDL (you'll need to generate this after building the program)
-// import { RiskGame } from '../types/risk_game';
+// Custom error class for game-specific errors
+export class GameError extends Error {
+  constructor(message: string, public code?: string) {
+    super(message);
+    this.name = 'GameError';
+  }
+}
 
 // Program ID from Anchor.toml
-const PROGRAM_ID = new PublicKey('G4irLCSNHfxh2eCVpXowciffLtbnwGm1mGXU28afPsPJ');
+const PROGRAM_ID = new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID || 'G4irLCSNHfxh2eCVpXowciffLtbnwGm1mGXU28afPsPJ');
 
 export class GameService {
   private program: Program;
@@ -19,23 +24,39 @@ export class GameService {
   ) {
     const provider = new AnchorProvider(connection, wallet, {
       commitment: 'confirmed',
+      preflightCommitment: 'confirmed',
     });
     this.program = new Program(IDL as Idl, PROGRAM_ID, provider);
   }
 
   async initializeGame(): Promise<{ gameAccount: PublicKey }> {
-    const gameAccount = PublicKey.unique();
-    
-    await this.program.methods
-      .initializeGame()
-      .accounts({
-        game: gameAccount,
-        creator: this.program.provider.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    try {
+      // Create a new keypair for the game account
+      const gameKeypair = Keypair.generate();
+      
+      await this.program.methods
+        .initializeGame()
+        .accounts({
+          game: gameKeypair.publicKey,
+          creator: this.program.provider.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([gameKeypair])
+        .rpc();
 
-    return { gameAccount };
+      return { gameAccount: gameKeypair.publicKey };
+    } catch (error: unknown) {
+      console.error('Error details:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('insufficient funds')) {
+          throw new GameError('Insufficient SOL to create game. Please fund your wallet.', 'INSUFFICIENT_FUNDS');
+        } else if (error.message.includes('Account not found')) {
+          throw new GameError('Game account not found. Please try again.', 'ACCOUNT_NOT_FOUND');
+        }
+        throw new GameError(`Failed to initialize game: ${error.message}`, 'INITIALIZATION_FAILED');
+      }
+      throw new GameError('An unknown error occurred while initializing the game', 'UNKNOWN_ERROR');
+    }
   }
 
   async joinGame(gameAccount: PublicKey): Promise<void> {

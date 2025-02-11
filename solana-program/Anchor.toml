@@ -5,11 +5,14 @@ skip-lint = false
 [programs.localnet]
 risk_game = "G4irLCSNHfxh2eCVpXowciffLtbnwGm1mGXU28afPsPJ"
 
+[programs.devnet]
+risk_game = "G4irLCSNHfxh2eCVpXowciffLtbnwGm1mGXU28afPsPJ"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "devnet"
 wallet = "/home/sam/.config/solana/id.json"
 
 [workspace]
