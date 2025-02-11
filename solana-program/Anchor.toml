@@ -3,7 +3,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-risk_game = "7GTG5YucwCqnmcHoeTVs8vwt9MhXjQdCXs8yToHpHPHC"
+risk_game = "2c6oia9bbPKJk1tV3PvYUULuiktyGF7hTpAZsndAo3ij"
 territory = "6YK2ZBHN2tCqbhYFPat3iLqYqSySSiVkMRjSfPUHS9sm"
 player = "Crw8PgBMPQ8xHmLnT7oMdp4ePpAcHHPyZeJXZQmAU6Lf"
 

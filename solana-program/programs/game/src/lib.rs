@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use std::hash::Hash;
 
-declare_id!("7GTG5YucwCqnmcHoeTVs8vwt9MhXjQdCXs8yToHpHPHC");
+declare_id!("2c6oia9bbPKJk1tV3PvYUULuiktyGF7hTpAZsndAo3ij");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum PlayerColor {
@@ -134,7 +134,7 @@ pub mod risk_game {
 
     pub fn place_reinforcements(
         ctx: Context<MakeMove>,
-        placements: Vec<(u8, u8)>, // Vec of (territory_id, troops)
+        placements: Vec<TerritoryPlacement>,
     ) -> Result<()> {
         let game = &mut ctx.accounts.game;
         require!(
@@ -155,17 +155,18 @@ pub mod risk_game {
             .ok_or(ErrorCode::NoReinforcements)?;
 
         // Validate total troops being placed matches reinforcements
-        let total_troops: u8 = placements.iter().map(|(_, troops)| troops).sum();
+        let total_troops: u8 = placements.iter().map(|p| p.troops).sum();
         require!(total_troops == reinforcements, ErrorCode::InvalidTroopCount);
 
         // Place troops
-        for (territory_id, troops) in placements {
-            let territory = &mut ctx.accounts.territory_account.territories[territory_id as usize];
+        for placement in placements {
+            let territory =
+                &mut ctx.accounts.territory_account.territories[placement.territory_id as usize];
             require!(
                 territory.owner == Some(ctx.accounts.player.key()),
                 ErrorCode::NotTerritoryOwner
             );
-            territory.troops += troops;
+            territory.troops += placement.troops;
         }
 
         // Clear pending reinforcements and move to attack phase
@@ -574,6 +575,12 @@ pub enum CardType {
     Cavalry,
     Artillery,
     Wild,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
+pub struct TerritoryPlacement {
+    pub territory_id: u8,
+    pub troops: u8,
 }
 
 #[error_code]

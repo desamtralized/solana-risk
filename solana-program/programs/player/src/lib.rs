@@ -145,7 +145,7 @@ pub mod cpi_interface {
         program: AccountInfo<'info>,
         player_state: AccountInfo<'info>,
         authority: AccountInfo<'info>,
-        new_player: super::Player,
+        new_player: Player,
     ) -> Result<()> {
         let ix = anchor_lang::solana_program::instruction::Instruction {
             program_id: program.key(),
@@ -165,7 +165,7 @@ pub mod cpi_interface {
         player_state: AccountInfo<'info>,
         authority: AccountInfo<'info>,
         player_pubkey: Pubkey,
-        cards: Vec<super::Card>,
+        cards: Vec<Card>,
     ) -> Result<()> {
         let ix = anchor_lang::solana_program::instruction::Instruction {
             program_id: program.key(),
@@ -208,7 +208,7 @@ pub mod cpi_interface {
 
     #[derive(AnchorSerialize, AnchorDeserialize)]
     pub struct AddPlayerArgs {
-        pub new_player: super::Player,
+        pub new_player: Player,
     }
 
     impl anchor_lang::InstructionData for AddPlayerArgs {}
@@ -220,7 +220,7 @@ pub mod cpi_interface {
     #[derive(AnchorSerialize, AnchorDeserialize)]
     pub struct UpdatePlayerCardsArgs {
         pub player_pubkey: Pubkey,
-        pub cards: Vec<super::Card>,
+        pub cards: Vec<Card>,
     }
 
     impl anchor_lang::InstructionData for UpdatePlayerCardsArgs {}

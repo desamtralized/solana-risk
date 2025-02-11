@@ -13,26 +13,35 @@ console.log('Environment check:');
 console.log('NEXT_PUBLIC_NETWORK:', process.env.NEXT_PUBLIC_NETWORK);
 console.log('NEXT_PUBLIC_LOCAL_WALLET_KEY exists:', !!process.env.NEXT_PUBLIC_LOCAL_WALLET_KEY);
 
-// Load local wallet if we're on localnet
-const localWallet = (() => {
-  if (process.env.NEXT_PUBLIC_NETWORK === 'localnet' && process.env.NEXT_PUBLIC_LOCAL_WALLET_KEY) {
-    console.log('Attempting to load local wallet for localnet...');
-    const wallet = createLocalWallet(process.env.NEXT_PUBLIC_LOCAL_WALLET_KEY);
-    if (wallet) {
-      console.log('Local wallet loaded successfully:', wallet.publicKey.toString());
-      return wallet;
-    } else {
-      console.error('Failed to create local wallet');
+// Load local wallets if we're on localnet
+const localWallets = (() => {
+  if (process.env.NEXT_PUBLIC_NETWORK === 'localnet') {
+    console.log('Attempting to load local wallets for localnet...');
+    const wallets = [];
+    
+    if (process.env.NEXT_PUBLIC_LOCAL_WALLET_1_KEY) {
+      const wallet1 = createLocalWallet(process.env.NEXT_PUBLIC_LOCAL_WALLET_1_KEY);
+      if (wallet1) {
+        console.log('Local wallet 1 loaded successfully:', wallet1.publicKey.toString());
+        wallets.push(wallet1);
+      }
     }
-  } else {
-    console.log('Not using local wallet. Network:', process.env.NEXT_PUBLIC_NETWORK);
-    console.log('Local wallet key available:', !!process.env.NEXT_PUBLIC_LOCAL_WALLET_KEY);
+    
+    if (process.env.NEXT_PUBLIC_LOCAL_WALLET_2_KEY) {
+      const wallet2 = createLocalWallet(process.env.NEXT_PUBLIC_LOCAL_WALLET_2_KEY);
+      if (wallet2) {
+        console.log('Local wallet 2 loaded successfully:', wallet2.publicKey.toString());
+        wallets.push(wallet2);
+      }
+    }
+    
+    return wallets.length > 0 ? wallets : null;
   }
   return null;
 })();
 
 class LocalWalletAdapter extends BaseWalletAdapter {
-  name = 'Local Wallet' as WalletName<'Local Wallet'>;
+  name: WalletName<string>;
   url = 'https://solana.com';
   icon = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiI+PC9zdmc+';
   supportedTransactionVersions = new Set(['legacy', 0] as const);
@@ -40,12 +49,13 @@ class LocalWalletAdapter extends BaseWalletAdapter {
   private _connected: boolean;
   private _publicKey: Keypair['publicKey'];
   
-  constructor(private keypair: Keypair) {
+  constructor(private keypair: Keypair, index: number) {
     super();
     this._connecting = false;
-    this._connected = true; // Start as connected since it's a local wallet
+    this._connected = false;
     this._publicKey = keypair.publicKey;
-    console.log('LocalWalletAdapter initialized with public key:', this._publicKey.toString());
+    this.name = `Local Wallet ${index + 1}` as WalletName<string>;
+    console.log(`LocalWalletAdapter ${index + 1} initialized with public key:`, this._publicKey.toString());
   }
 
   get connecting() {
@@ -136,15 +146,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const wallets = useMemo(() => {
     console.log('Initializing wallet adapters:');
     console.log('Network:', process.env.NEXT_PUBLIC_NETWORK);
-    console.log('Local wallet available:', !!localWallet);
+    console.log('Local wallets available:', localWallets?.length || 0);
     
-    if (process.env.NEXT_PUBLIC_NETWORK === 'localnet' && localWallet) {
-      console.log('Using LocalWalletAdapter');
-      const adapter = new LocalWalletAdapter(localWallet);
-      // Prevent Phantom from being included
-      return [adapter];
+    if (process.env.NEXT_PUBLIC_NETWORK === 'localnet' && localWallets) {
+      console.log('Using LocalWalletAdapters');
+      return localWallets.map((wallet, index) => new LocalWalletAdapter(wallet, index));
     }
-    console.log('Using PhantomWalletAdapter');
+    
     return [new PhantomWalletAdapter()];
   }, []);
 
