@@ -252,5 +252,8 @@
       "name": "InvalidAuthority",
       "msg": "Invalid authority"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "B7LjgrBXmJoBjmvko8ebE2Dw4dEUds7Bt1G6TXUbb687"
+  }
 }

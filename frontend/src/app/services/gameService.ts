@@ -3,7 +3,9 @@ import { Connection, PublicKey, SystemProgram, Keypair } from '@solana/web3.js';
 import { AnchorWallet } from '@solana/wallet-adapter-react';
 import { INITIAL_TERRITORIES } from '../constants/gameData';
 import { GAME_PROGRAM_ID, PLAYER_PROGRAM_ID, TERRITORY_PROGRAM_ID } from '../constants/programIds';
-import { GameIDL, PlayerIDL, TerritoryIDL, RiskGame, Player, Territory as TerritoryProgram, GameAccount } from '../idl/types';
+import { IDL as GameIDL, RiskGame } from '../idl/risk_game';
+import { IDL as PlayerIDL, Player } from '../idl/player';
+import { IDL as TerritoryIDL, Territory } from '../idl/territory';
 
 // Custom error class for game-specific errors
 export class GameError extends Error {
@@ -27,10 +29,15 @@ interface ProgramContinent {
   bonusArmies: number;
 }
 
+interface TerritoryPlacement {
+  territoryId: number;
+  troops: number;
+}
+
 export class GameService {
   private program: Program<RiskGame>;
   private playerProgram: Program<Player>;
-  private territoryProgram: Program<TerritoryProgram>;
+  private territoryProgram: Program<Territory>;
 
   constructor(
     connection: Connection,
@@ -40,27 +47,26 @@ export class GameService {
       commitment: 'confirmed',
       preflightCommitment: 'confirmed',
     });
+
     this.program = new Program(GameIDL, GAME_PROGRAM_ID, provider);
     this.playerProgram = new Program(PlayerIDL, PLAYER_PROGRAM_ID, provider);
     this.territoryProgram = new Program(TerritoryIDL, TERRITORY_PROGRAM_ID, provider);
   }
 
   private transformTerritories(territories: typeof INITIAL_TERRITORIES): ProgramTerritory[] {
-    // Optimize territory data by using smaller adjacent territory arrays
-    return territories.slice(0, 15).map(t => ({  // Reduce to 15 territories initially
+    return territories.slice(0, 15).map(t => ({
       id: t.id,
       continentId: parseInt(t.continent),
       owner: null,
       troops: 0,
-      adjacentTerritories: Buffer.from(new Uint8Array(t.adjacentTerritories.slice(0, 4))),  // Limit to 4 adjacent territories
+      adjacentTerritories: Buffer.from(new Uint8Array(t.adjacentTerritories.slice(0, 4))),
     }));
   }
 
   private transformContinents(continents: { id: string; territories: number[]; bonusArmies: number }[]): ProgramContinent[] {
-    // Only include essential continent data
-    return continents.slice(0, 3).map(c => ({  // Reduce to 3 continents initially
+    return continents.slice(0, 3).map(c => ({
       id: parseInt(c.id),
-      territories: Buffer.from(new Uint8Array(c.territories.slice(0, 5))),  // Limit to 5 territories per continent
+      territories: Buffer.from(new Uint8Array(c.territories.slice(0, 5))),
       bonusArmies: c.bonusArmies,
     }));
   }
@@ -130,6 +136,48 @@ export class GameService {
       .rpc();
   }
 
+  async startGame(gameAccount: PublicKey): Promise<void> {
+    const provider = this.program.provider as AnchorProvider;
+    if (!provider.wallet.publicKey) {
+      throw new GameError('Wallet not connected', 'WALLET_NOT_CONNECTED');
+    }
+
+    const walletPublicKey = provider.wallet.publicKey;
+    const playerAccount = await this.findPlayerAccountPDA(gameAccount);
+    const territoryAccount = await this.findTerritoryAccountPDA(gameAccount);
+
+    try {
+      await this.program.methods
+        .distributeInitialTerritories()
+        .accounts({
+          game: gameAccount,
+          territoryAccount,
+          playerAccount,
+          player: walletPublicKey,
+          territoryProgram: this.territoryProgram.programId,
+          territoryState: territoryAccount,
+          playerProgram: this.playerProgram.programId,
+          playerState: playerAccount,
+        })
+        .rpc();
+    } catch (error) {
+      console.error('Error starting game:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('InvalidPlayerCount')) {
+          throw new GameError('Game requires between 2 and 6 players to start', 'INVALID_PLAYER_COUNT');
+        }
+        if (error.message.includes('GameAlreadyStarted')) {
+          throw new GameError('Game has already started', 'GAME_ALREADY_STARTED');
+        }
+        if (error.message.includes('NotPlayerTurn')) {
+          throw new GameError('Only the game creator can start the game', 'NOT_CREATOR');
+        }
+        throw new GameError(`Failed to start game: ${error.message}`, 'START_GAME_FAILED');
+      }
+      throw new GameError('An unknown error occurred while starting the game', 'UNKNOWN_ERROR');
+    }
+  }
+
   private async findPlayerAccountPDA(gameAccount: PublicKey): Promise<PublicKey> {
     const [pda] = await PublicKey.findProgramAddress(
       [Buffer.from('player'), gameAccount.toBuffer()],
@@ -159,7 +207,10 @@ export class GameService {
     const playerAccount = await this.findPlayerAccountPDA(gameAccount);
     const territoryAccount = await this.findTerritoryAccountPDA(gameAccount);
 
-    const formattedPlacements = placements.map(p => [p.territoryId, p.troops]);
+    const formattedPlacements: TerritoryPlacement[] = placements.map(p => ({
+      territoryId: p.territoryId,
+      troops: p.troops,
+    }));
 
     await this.program.methods
       .placeReinforcements(formattedPlacements)
@@ -289,8 +340,8 @@ export class GameService {
       .rpc();
   }
 
-  async getGameState(gameAccount: PublicKey): Promise<GameAccount> {
+  async getGameState(gameAccount: PublicKey): Promise<ReturnType<Program<RiskGame>['account']['game']['fetch']>> {
     const account = await this.program.account.game.fetch(gameAccount);
-    return account as unknown as GameAccount;
+    return account;
   }
 } 

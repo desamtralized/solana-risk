@@ -435,6 +435,75 @@ pub mod risk_game {
 
         Ok(())
     }
+
+    pub fn start_game(ctx: Context<MakeMove>) -> Result<()> {
+        let game = &mut ctx.accounts.game;
+        let territory_account = &mut ctx.accounts.territory_account;
+        let player_account = &ctx.accounts.player_account;
+
+        // Only creator can start the game
+        require!(
+            game.current_player == ctx.accounts.player.key(),
+            ErrorCode::NotPlayerTurn
+        );
+
+        // Game must be in Setup state
+        require!(
+            game.state == GameState::Setup,
+            ErrorCode::GameAlreadyStarted
+        );
+
+        // Need at least 2 players
+        require!(
+            player_account.players.len() >= 2 && player_account.players.len() <= 6,
+            ErrorCode::InvalidPlayerCount
+        );
+
+        // Calculate initial armies based on player count
+        let initial_armies = match player_account.players.len() {
+            2 => 40,
+            3 => 35,
+            4 => 30,
+            5 => 25,
+            6 => 20,
+            _ => return Err(error!(ErrorCode::InvalidPlayerCount)),
+        };
+
+        // Distribute territories randomly
+        distribute_territories(territory_account, player_account);
+
+        // Set initial armies for each player
+        for player in player_account.players.iter() {
+            let territories_owned = territory_account
+                .territories
+                .iter()
+                .filter(|t| t.owner == Some(player.pubkey))
+                .count();
+
+            // Calculate armies per territory
+            let armies_per_territory = initial_armies / territories_owned as u8;
+            let remaining_armies = initial_armies % territories_owned as u8;
+
+            // Distribute armies evenly
+            for (i, territory) in territory_account
+                .territories
+                .iter_mut()
+                .filter(|t| t.owner == Some(player.pubkey))
+                .enumerate()
+            {
+                territory.troops = armies_per_territory;
+                if i == 0 {
+                    territory.troops += remaining_armies;
+                }
+            }
+        }
+
+        // Set game state to InProgress
+        game.state = GameState::InProgress;
+        game.current_phase = TurnPhase::Reinforcement;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -575,6 +644,7 @@ pub enum ErrorCode {
     InvalidCardIndex,
     TerritoriesNotConnected,
     InvalidColor,
+    InvalidPlayerCount,
 }
 
 impl Game {

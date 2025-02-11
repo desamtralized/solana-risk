@@ -267,5 +267,8 @@
       "name": "PlayerNotFound",
       "msg": "Player not found"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "2iBoeN8h5q4FJcHJ44r8atL1VHQ59GrwxqU1fzwizCpq"
+  }
 }
