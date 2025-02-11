@@ -3,9 +3,9 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-risk_game = "3f99xoYXfEpxpZUJ1qJBub7RTVzh6Bshhz4B6XmGg7pJ"
-territory = "H2dZuXiCKq9hM6zoEqS65WSVDqX6NqNoLdVKhisqvQew"
-player = "ENa7qCdrgNivCpZQfjFVUEdAHkiZmohcAJ12KE3ZWGcf"
+risk_game = "3BxfMQouUVCckUpmbyfF9eGeHnzfJSJPzuZPpCvt99E7"
+territory = "2cdfpKZqQxfHKwtZ8WckqdYCT2CHAUaLMkzv1E5CktyQ"
+player = "H4kwyhKMgNKT7sKdk1FhwzYDrYP6Rwf6YijxpGq6tVoh"
 
 [programs.devnet]
 risk_game = "G4irLCSNHfxh2eCVpXowciffLtbnwGm1mGXU28afPsPJ"

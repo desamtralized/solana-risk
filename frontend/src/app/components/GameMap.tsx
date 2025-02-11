@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Territory, GameAccount, TERRITORY_COORDINATES } from '../types/game';
+import { INITIAL_TERRITORIES } from '../constants/gameData';
 
 interface GameMapProps {
   gameState: GameAccount | null;
@@ -20,8 +21,10 @@ export default function GameMap({ gameState, onTerritorySelect, selectedTerritor
   }, []);
 
   useEffect(() => {
-    if (gameState) {
+    if (gameState?.territories) {
       setTerritories(gameState.territories);
+    } else {
+      setTerritories(INITIAL_TERRITORIES);
     }
   }, [gameState]);
 
@@ -41,40 +44,56 @@ export default function GameMap({ gameState, onTerritorySelect, selectedTerritor
     return <div className="fixed inset-0 bg-gray-100" />;
   }
 
+  if (!territories || territories.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-gray-100 flex items-center justify-center">
+        <div className="text-lg">Loading map...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-0">
+    <div className="absolute inset-0" style={{ width: '100%', height: '100%', zIndex: 0 }}>
       <MapContainer
         center={[20, 0]}
         zoom={3.5}
         style={{ height: "100%", width: "100%" }}
         maxBounds={[[-90, -180], [90, 180]]}
-        zoomControl={false}
+        minZoom={2}
+        maxZoom={6}
+        zoomControl={true}
+        scrollWheelZoom={true}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           noWrap={true}
         />
-        {territories.map((territory) => (
-          <Polygon
-            key={territory.id}
-            positions={TERRITORY_COORDINATES[territory.name]}
-            pathOptions={getTerritoryStyling(territory)}
-            eventHandlers={{
-              click: () => onTerritorySelect(territory)
-            }}
-          >
-            <Popup>
-              <div className="text-center">
-                <h3 className="font-bold">{territory.name}</h3>
-                <p>Troops: {territory.troops}</p>
-                <p>Owner: {territory.owner ? 
-                  `${territory.owner.toString().slice(0, 4)}...${territory.owner.toString().slice(-4)}` : 
-                  'Unclaimed'}</p>
-              </div>
-            </Popup>
-          </Polygon>
-        ))}
+        {territories.map((territory) => {
+          const coordinates = TERRITORY_COORDINATES[territory.continent];
+          if (!coordinates) return null;
+          
+          return (
+            <Polygon
+              key={territory.id}
+              positions={coordinates}
+              pathOptions={getTerritoryStyling(territory)}
+              eventHandlers={{
+                click: () => onTerritorySelect(territory)
+              }}
+            >
+              <Popup>
+                <div className="text-center">
+                  <h3 className="font-bold">{territory.name}</h3>
+                  <p>Troops: {territory.troops}</p>
+                  <p>Owner: {territory.owner ? 
+                    `${territory.owner.toString().slice(0, 4)}...${territory.owner.toString().slice(-4)}` : 
+                    'Unclaimed'}</p>
+                </div>
+              </Popup>
+            </Polygon>
+          );
+        })}
       </MapContainer>
     </div>
   );
