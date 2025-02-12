@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program;
 
-declare_id!("6YK2ZBHN2tCqbhYFPat3iLqYqSySSiVkMRjSfPUHS9sm");
+declare_id!("Gu4nuCyvCNYxwmZMzuXwa1BiynAB1NEYk9Rdiy4Nr4ZG");
 
 #[program]
 pub mod territory {
@@ -141,53 +142,68 @@ pub enum TerritoryError {
 #[cfg(feature = "cpi")]
 pub mod cpi_interface {
     use super::*;
-    use anchor_lang::solana_program::instruction::AccountMeta;
+
+    #[derive(Accounts)]
+    pub struct UpdateTerritoryCpi<'info> {
+        #[account(mut)]
+        pub territory_state: Account<'info, TerritoryState>,
+        pub authority: Signer<'info>,
+    }
+
+    #[derive(Accounts)]
+    pub struct AreTerritoriesConnectedCpi<'info> {
+        pub territory_state: Account<'info, TerritoryState>,
+    }
 
     pub fn update_territory<'info>(
-        program: AccountInfo<'info>,
-        territory_state: AccountInfo<'info>,
-        authority: AccountInfo<'info>,
+        cpi_ctx: CpiContext<'_, '_, '_, 'info, UpdateTerritoryCpi<'info>>,
         territory_id: u8,
         owner: Option<Pubkey>,
         troops: u8,
     ) -> Result<()> {
+        let accounts = cpi_ctx.to_account_metas(None);
         let ix = anchor_lang::solana_program::instruction::Instruction {
-            program_id: program.key(),
-            accounts: vec![
-                AccountMeta::new(territory_state.key(), false),
-                AccountMeta::new_readonly(authority.key(), true),
-            ],
-            data: anchor_lang::InstructionData::data(&UpdateTerritoryArgs {
+            program_id: cpi_ctx.program.key(),
+            accounts,
+            data: anchor_lang::InstructionData::data(&crate::instruction::UpdateTerritory {
                 territory_id,
                 owner,
                 troops,
             }),
         };
-
-        anchor_lang::solana_program::program::invoke_signed(&ix, &[territory_state, authority], &[])
-            .map_err(Into::into)
+        
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                cpi_ctx.accounts.territory_state.to_account_info(),
+                cpi_ctx.accounts.authority.to_account_info(),
+            ],
+            cpi_ctx.signer_seeds,
+        ).map_err(Into::into)
     }
 
     pub fn are_territories_connected<'info>(
-        program: AccountInfo<'info>,
-        territory_state: AccountInfo<'info>,
+        cpi_ctx: CpiContext<'_, '_, '_, 'info, AreTerritoriesConnectedCpi<'info>>,
         start: u8,
         end: u8,
         owner: Pubkey,
     ) -> Result<bool> {
+        let accounts = cpi_ctx.to_account_metas(None);
         let ix = anchor_lang::solana_program::instruction::Instruction {
-            program_id: program.key(),
-            accounts: vec![AccountMeta::new(territory_state.key(), false)],
-            data: anchor_lang::InstructionData::data(&AreTerritoriesConnectedArgs {
+            program_id: cpi_ctx.program.key(),
+            accounts,
+            data: anchor_lang::InstructionData::data(&crate::instruction::AreTerritoriesConnected {
                 start,
                 end,
                 owner,
             }),
         };
 
-        anchor_lang::solana_program::program::invoke_signed(&ix, &[territory_state], &[])
-            .map(|_| true)
-            .map_err(Into::into)
+        solana_program::program::invoke_signed(
+            &ix,
+            &[cpi_ctx.accounts.territory_state.to_account_info()],
+            cpi_ctx.signer_seeds,
+        ).map(|_| true).map_err(Into::into)
     }
 
     #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -197,22 +213,10 @@ pub mod cpi_interface {
         pub troops: u8,
     }
 
-    impl anchor_lang::InstructionData for UpdateTerritoryArgs {}
-
-    impl anchor_lang::Discriminator for UpdateTerritoryArgs {
-        const DISCRIMINATOR: [u8; 8] = [0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
-    }
-
     #[derive(AnchorSerialize, AnchorDeserialize)]
     pub struct AreTerritoriesConnectedArgs {
         pub start: u8,
         pub end: u8,
         pub owner: Pubkey,
-    }
-
-    impl anchor_lang::InstructionData for AreTerritoriesConnectedArgs {}
-
-    impl anchor_lang::Discriminator for AreTerritoriesConnectedArgs {
-        const DISCRIMINATOR: [u8; 8] = [0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
     }
 }
