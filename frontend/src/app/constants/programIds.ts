@@ -1,13 +1,17 @@
 import { PublicKey } from '@solana/web3.js';
 
-export const PLAYER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_PLAYER_PROGRAM_ID || 'Crw8PgBMPQ8xHmLnT7oMdp4ePpAcHHPyZeJXZQmAU6Lf'
-);
+if (!process.env.NEXT_PUBLIC_PLAYER_PROGRAM_ID) {
+  throw new Error('NEXT_PUBLIC_PLAYER_PROGRAM_ID environment variable is not set');
+}
 
-export const TERRITORY_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_TERRITORY_PROGRAM_ID || '6YK2ZBHN2tCqbhYFPat3iLqYqSySSiVkMRjSfPUHS9sm'
-);
+if (!process.env.NEXT_PUBLIC_TERRITORY_PROGRAM_ID) {
+  throw new Error('NEXT_PUBLIC_TERRITORY_PROGRAM_ID environment variable is not set');
+}
 
-export const GAME_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_GAME_PROGRAM_ID || '7GTG5YucwCqnmcHoeTVs8vwt9MhXjQdCXs8yToHpHPHC'
-); 
+if (!process.env.NEXT_PUBLIC_GAME_PROGRAM_ID) {
+  throw new Error('NEXT_PUBLIC_GAME_PROGRAM_ID environment variable is not set');
+}
+
+export const PLAYER_PROGRAM_ID = new PublicKey(process.env.NEXT_PUBLIC_PLAYER_PROGRAM_ID);
+export const TERRITORY_PROGRAM_ID = new PublicKey(process.env.NEXT_PUBLIC_TERRITORY_PROGRAM_ID);
+export const GAME_PROGRAM_ID = new PublicKey(process.env.NEXT_PUBLIC_GAME_PROGRAM_ID); 

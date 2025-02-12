@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::system_program;
 
 use std::hash::Hash;
 
-declare_id!("2c6oia9bbPKJk1tV3PvYUULuiktyGF7hTpAZsndAo3ij");
+declare_id!("HPCKDTSpzsD5RuA9uWbHSoM7qVvqwa9KmU8Ws6dquSEr");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum PlayerColor {
@@ -196,11 +197,6 @@ pub mod risk_game {
             ErrorCode::InvalidPhase
         );
 
-        // Use territory program to validate and update territories
-        let territory_program = ctx.accounts.territory_program.to_account_info();
-        let territory_state = ctx.accounts.territory_state.to_account_info();
-        let authority = ctx.accounts.player.to_account_info();
-
         // Get territory information
         let from_territory_ref = &ctx.accounts.territory_state.territories[from_territory as usize];
         require!(
@@ -231,48 +227,77 @@ pub mod risk_game {
         let (attacker_losses, defender_losses) = resolve_combat(&attacker_dice, &defender_dice);
 
         // Update territories using CPI
+        let territory_cpi_program = ctx.accounts.territory_program.to_account_info();
+        let territory_cpi_accounts = territory::cpi_interface::UpdateTerritoryCpi {
+            territory_state: ctx.accounts.territory_state.clone(),
+            authority: ctx.accounts.player.clone(),
+        };
+        let territory_cpi_ctx = CpiContext::new(
+            territory_cpi_program.clone(),
+            territory_cpi_accounts,
+        );
+
         territory::cpi_interface::update_territory(
-            territory_program.clone(),
-            territory_state.clone(),
-            authority.clone(),
+            territory_cpi_ctx,
             from_territory,
             Some(ctx.accounts.player.key()),
             from_territory_ref.troops - attacker_losses,
         )?;
 
-        let defending_territory =
-            &mut ctx.accounts.territory_state.territories[to_territory as usize];
-        if defending_territory.troops <= defender_losses {
+        // Get the defending territory's current state
+        let defending_troops = ctx.accounts.territory_state.territories[to_territory as usize].troops;
+        let defending_owner = ctx.accounts.territory_state.territories[to_territory as usize].owner;
+
+        if defending_troops <= defender_losses {
             // Territory conquered
+            let territory_cpi_accounts = territory::cpi_interface::UpdateTerritoryCpi {
+                territory_state: ctx.accounts.territory_state.clone(),
+                authority: ctx.accounts.player.clone(),
+            };
+            let territory_cpi_ctx = CpiContext::new(
+                territory_cpi_program.clone(),
+                territory_cpi_accounts,
+            );
+
             territory::cpi_interface::update_territory(
-                territory_program.clone(),
-                territory_state.clone(),
-                authority.clone(),
+                territory_cpi_ctx,
                 to_territory,
                 Some(ctx.accounts.player.key()),
                 attacking_dice - attacker_losses,
             )?;
 
             // Update player state using CPI
-            let player_program = ctx.accounts.player_program.to_account_info();
-            let player_state = ctx.accounts.player_state.to_account_info();
+            let player_cpi_program = ctx.accounts.player_program.to_account_info();
+            let player_cpi_accounts = player::cpi_interface::SetConqueredTerritoryCpi {
+                player_state: ctx.accounts.player_state.clone(),
+                authority: ctx.accounts.player.clone(),
+            };
+            let player_cpi_ctx = CpiContext::new(
+                player_cpi_program,
+                player_cpi_accounts,
+            );
 
             player::cpi_interface::set_conquered_territory(
-                player_program,
-                player_state,
-                authority.clone(),
+                player_cpi_ctx,
                 ctx.accounts.player.key(),
                 true,
             )?;
         } else {
             // Territory not conquered
+            let territory_cpi_accounts = territory::cpi_interface::UpdateTerritoryCpi {
+                territory_state: ctx.accounts.territory_state.clone(),
+                authority: ctx.accounts.player.clone(),
+            };
+            let territory_cpi_ctx = CpiContext::new(
+                territory_cpi_program,
+                territory_cpi_accounts,
+            );
+
             territory::cpi_interface::update_territory(
-                territory_program.clone(),
-                territory_state.clone(),
-                authority.clone(),
+                territory_cpi_ctx,
                 to_territory,
-                defending_territory.owner,
-                defending_territory.troops - defender_losses,
+                defending_owner,
+                defending_troops - defender_losses,
             )?;
         }
 

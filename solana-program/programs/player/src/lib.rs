@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program;
 
-declare_id!("Crw8PgBMPQ8xHmLnT7oMdp4ePpAcHHPyZeJXZQmAU6Lf");
+declare_id!("7mAbgXFoe9YCnjkP2YbHP6KVuPBXyWSqg6uDLpfgBKqQ");
 
 #[program]
 pub mod player {
@@ -139,82 +140,104 @@ pub enum PlayerError {
 #[cfg(feature = "cpi")]
 pub mod cpi_interface {
     use super::*;
-    use anchor_lang::solana_program::instruction::AccountMeta;
+
+    #[derive(Accounts)]
+    pub struct AddPlayerCpi<'info> {
+        #[account(mut)]
+        pub player_state: Account<'info, PlayerState>,
+        pub authority: Signer<'info>,
+    }
+
+    #[derive(Accounts)]
+    pub struct UpdatePlayerCardsCpi<'info> {
+        #[account(mut)]
+        pub player_state: Account<'info, PlayerState>,
+        pub authority: Signer<'info>,
+    }
+
+    #[derive(Accounts)]
+    pub struct SetConqueredTerritoryCpi<'info> {
+        #[account(mut)]
+        pub player_state: Account<'info, PlayerState>,
+        pub authority: Signer<'info>,
+    }
 
     pub fn add_player<'info>(
-        program: AccountInfo<'info>,
-        player_state: AccountInfo<'info>,
-        authority: AccountInfo<'info>,
+        cpi_ctx: CpiContext<'_, '_, '_, 'info, AddPlayerCpi<'info>>,
         new_player: Player,
     ) -> Result<()> {
+        let accounts = cpi_ctx.to_account_metas(None);
         let ix = anchor_lang::solana_program::instruction::Instruction {
-            program_id: program.key(),
-            accounts: vec![
-                AccountMeta::new(player_state.key(), false),
-                AccountMeta::new_readonly(authority.key(), true),
-            ],
-            data: anchor_lang::InstructionData::data(&AddPlayerArgs { new_player }),
+            program_id: cpi_ctx.program.key(),
+            accounts,
+            data: anchor_lang::InstructionData::data(&crate::instruction::AddPlayer {
+                new_player,
+            }),
         };
-
-        anchor_lang::solana_program::program::invoke_signed(&ix, &[player_state, authority], &[])
-            .map_err(Into::into)
+        
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                cpi_ctx.accounts.player_state.to_account_info(),
+                cpi_ctx.accounts.authority.to_account_info(),
+            ],
+            cpi_ctx.signer_seeds,
+        ).map_err(Into::into)
     }
 
     pub fn update_player_cards<'info>(
-        program: AccountInfo<'info>,
-        player_state: AccountInfo<'info>,
-        authority: AccountInfo<'info>,
+        cpi_ctx: CpiContext<'_, '_, '_, 'info, UpdatePlayerCardsCpi<'info>>,
         player_pubkey: Pubkey,
         cards: Vec<Card>,
     ) -> Result<()> {
+        let accounts = cpi_ctx.to_account_metas(None);
         let ix = anchor_lang::solana_program::instruction::Instruction {
-            program_id: program.key(),
-            accounts: vec![
-                AccountMeta::new(player_state.key(), false),
-                AccountMeta::new_readonly(authority.key(), true),
-            ],
-            data: anchor_lang::InstructionData::data(&UpdatePlayerCardsArgs {
+            program_id: cpi_ctx.program.key(),
+            accounts,
+            data: anchor_lang::InstructionData::data(&crate::instruction::UpdatePlayerCards {
                 player_pubkey,
                 cards,
             }),
         };
-
-        anchor_lang::solana_program::program::invoke_signed(&ix, &[player_state, authority], &[])
-            .map_err(Into::into)
+        
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                cpi_ctx.accounts.player_state.to_account_info(),
+                cpi_ctx.accounts.authority.to_account_info(),
+            ],
+            cpi_ctx.signer_seeds,
+        ).map_err(Into::into)
     }
 
     pub fn set_conquered_territory<'info>(
-        program: AccountInfo<'info>,
-        player_state: AccountInfo<'info>,
-        authority: AccountInfo<'info>,
+        cpi_ctx: CpiContext<'_, '_, '_, 'info, SetConqueredTerritoryCpi<'info>>,
         player_pubkey: Pubkey,
         conquered_this_turn: bool,
     ) -> Result<()> {
+        let accounts = cpi_ctx.to_account_metas(None);
         let ix = anchor_lang::solana_program::instruction::Instruction {
-            program_id: program.key(),
-            accounts: vec![
-                AccountMeta::new(player_state.key(), false),
-                AccountMeta::new_readonly(authority.key(), true),
-            ],
-            data: anchor_lang::InstructionData::data(&SetConqueredTerritoryArgs {
+            program_id: cpi_ctx.program.key(),
+            accounts,
+            data: anchor_lang::InstructionData::data(&crate::instruction::SetConqueredTerritory {
                 player_pubkey,
                 conquered_this_turn,
             }),
         };
-
-        anchor_lang::solana_program::program::invoke_signed(&ix, &[player_state, authority], &[])
-            .map_err(Into::into)
+        
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                cpi_ctx.accounts.player_state.to_account_info(),
+                cpi_ctx.accounts.authority.to_account_info(),
+            ],
+            cpi_ctx.signer_seeds,
+        ).map_err(Into::into)
     }
 
     #[derive(AnchorSerialize, AnchorDeserialize)]
     pub struct AddPlayerArgs {
         pub new_player: Player,
-    }
-
-    impl anchor_lang::InstructionData for AddPlayerArgs {}
-
-    impl anchor_lang::Discriminator for AddPlayerArgs {
-        const DISCRIMINATOR: [u8; 8] = [0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
     }
 
     #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -223,21 +246,9 @@ pub mod cpi_interface {
         pub cards: Vec<Card>,
     }
 
-    impl anchor_lang::InstructionData for UpdatePlayerCardsArgs {}
-
-    impl anchor_lang::Discriminator for UpdatePlayerCardsArgs {
-        const DISCRIMINATOR: [u8; 8] = [0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
-    }
-
     #[derive(AnchorSerialize, AnchorDeserialize)]
     pub struct SetConqueredTerritoryArgs {
         pub player_pubkey: Pubkey,
         pub conquered_this_turn: bool,
-    }
-
-    impl anchor_lang::InstructionData for SetConqueredTerritoryArgs {}
-
-    impl anchor_lang::Discriminator for SetConqueredTerritoryArgs {
-        const DISCRIMINATOR: [u8; 8] = [0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
     }
 }
