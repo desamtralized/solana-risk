@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::system_program;
 
 use std::hash::Hash;
 
-declare_id!("HPCKDTSpzsD5RuA9uWbHSoM7qVvqwa9KmU8Ws6dquSEr");
+declare_id!("7WWspBhgdSxJHdvuBXsBffFM4Ls6LwtXjYeZ4o6T7kry");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum PlayerColor {
@@ -493,12 +492,21 @@ pub struct InitializeGame<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(color: String)]
 pub struct JoinGame<'info> {
     #[account(mut)]
     pub game: Account<'info, Game>,
-    #[account(mut, constraint = player_account.game == game.key())]
+    #[account(
+        init_if_needed,
+        payer = player,
+        space = 8 + PlayerAccount::SPACE,
+        seeds = [b"player", game.key().as_ref()],
+        bump,
+    )]
     pub player_account: Account<'info, PlayerAccount>,
+    #[account(mut)]
     pub player: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

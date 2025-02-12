@@ -132,6 +132,7 @@ export class GameService {
         game: gameAccount,
         playerAccount: await this.findPlayerAccountPDA(gameAccount),
         player: walletPublicKey,
+        systemProgram: SystemProgram.programId,
       })
       .rpc();
   }
@@ -181,7 +182,7 @@ export class GameService {
   private async findPlayerAccountPDA(gameAccount: PublicKey): Promise<PublicKey> {
     const [pda] = await PublicKey.findProgramAddress(
       [Buffer.from('player'), gameAccount.toBuffer()],
-      this.playerProgram.programId
+      this.program.programId
     );
     return pda;
   }
@@ -189,7 +190,7 @@ export class GameService {
   private async findTerritoryAccountPDA(gameAccount: PublicKey): Promise<PublicKey> {
     const [pda] = await PublicKey.findProgramAddress(
       [Buffer.from('territory'), gameAccount.toBuffer()],
-      this.territoryProgram.programId
+      this.program.programId
     );
     return pda;
   }

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 
-declare_id!("7mAbgXFoe9YCnjkP2YbHP6KVuPBXyWSqg6uDLpfgBKqQ");
+declare_id!("31axM9hfTEAvD9Kx8CUQCHXdETYBK8L3Pnzf7usQutbB");
 
 #[program]
 pub mod player {

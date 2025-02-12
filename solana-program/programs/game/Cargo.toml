@@ -16,6 +16,6 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.29.0"
+anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 territory = { path = "../territory", features = ["cpi"] }
 player = { path = "../player", features = ["cpi"] } 

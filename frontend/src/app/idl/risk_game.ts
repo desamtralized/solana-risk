@@ -69,8 +69,13 @@ export type RiskGame = {
         },
         {
           "name": "player",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -910,8 +915,13 @@ export const IDL: RiskGame = {
         },
         {
           "name": "player",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
